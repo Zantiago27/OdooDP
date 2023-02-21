@@ -1,5 +1,36 @@
-sudo pip3 install Babel==2.6.0  chardet==3.0.4 decorator==4.3.0  docutils==0.14 ebaysdk==2.1.5 feedparser==5.2.1 freezegun==0.3.15 
-gevent==20.9.0  greenlet==0.4.17 html2text==2018.1.9 idna==2.6 Jinja2==2.11.2 libsass==0.17.0  lxml==4.6.1 Mako==1.0.7 MarkupSafe==1.1.0 
-mock==2.0.0 num2words==0.5.6  ofxparse==0.19 passlib==1.7.1 Pillow==8.1.1 polib==1.1.0 psutil==5.6.6 psycopg2==2.8.5  pydot==1.4.1 pyparsing==2.2.0 
-python-ldap==3.1.0 PyPDF2==1.26.0 pyserial==3.4 python-dateutil==2.7.3 pytz==2019.1  pyusb==1.0.2 qrcode==6.1 reportlab==3.5.55 requests==2.21.0 zeep==3.2.0 
-vatnumber==1.2 python-stdnum==1.8 vobject==0.9.6.1  Werkzeug==0.16.1 XlsxWriter==1.1.2 xlwt==1.3.* xlrd==1.2.0
+#!/bin/bash
+#Creamos el usuario y grupo de sistema 'odoo':
+sudo adduser --system --quiet --shell=/bin/bash --home=/opt/odoo --gecos 'odoo' --group odoo
+#Creamos en directorio en donde se almacenará el archivo de configuración y log de odoo:
+sudo mkdir /etc/odoo && sudo mkdir /var/log/odoo/
+# Instalamos Postgres y librerías base del sistema:
+sudo apt update && sudo apt install postgresql postgresql-server-dev-12 build-essential python3-pil python3-lxml python3-ldap3 python3-dev python3-pip python3-setuptools nodejs git libldap2-dev libsasl2-dev libxml2-dev libxslt1-dev libjpeg-dev npm -y
+#Descargamos odoo version 15 desde git:
+sudo git clone --depth 1 --branch 15.0 https://github.com/odoo/odoo /opt/odoo/odoo
+#sudo git clone --depth 1 --branch master https://github.com/odoo/odoo /opt/odoo/odoo
+#Damos permiso al directorio que contiene los archivos de OdooERP  e instalamos las dependencias de python3:
+sudo chown odoo:odoo /opt/odoo/ -R && sudo chown odoo:odoo /var/log/odoo/ -R && cd /opt/odoo/odoo && sudo pip3 install -r requirements.txt
+#Usamos npm, que es el gestor de paquetes Node.js para instalar less:
+sudo npm install -g less less-plugin-clean-css -y && sudo ln -s /usr/bin/nodejs /usr/bin/node
+#Descargamos dependencias e instalar wkhtmltopdf para generar PDF en odoo
+sudo apt install fontconfig xfonts-base xfonts-75dpi -y
+cd /tmp
+wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.focal_amd64.deb && sudo dpkg -i wkhtmltox_0.12.6-1.focal_amd64.deb
+sudo ln -s /usr/local/bin/wkhtmltopdf /usr/bin/
+sudo ln -s /usr/local/bin/wkhtmltoimage /usr/bin/
+#wget -N http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz && sudo gunzip GeoLiteCity.dat.gz && sudo mkdir /usr/share/GeoIP/ && sudo mv GeoLiteCity.dat /usr/share/GeoIP/
+#Creamos un usuario 'odoo' para la base de datos:
+sudo su - postgres -c "createuser -s odoo"
+#Creamos la configuracion de Odoo:
+sudo su - odoo -c "/opt/odoo/odoo/odoo-bin --addons-path=/opt/odoo/odoo/addons -s --stop-after-init"
+#Creamos el archivo de configuracion de odoo:
+sudo mv /opt/odoo/.odoorc /etc/odoo/odoo.conf
+#Agregamos los siguientes parámetros al archivo de configuración de odoo:
+sudo sed -i "s,^\(logfile = \).*,\1"/var/log/odoo/odoo-server.log"," /etc/odoo/odoo.conf
+#sudo sed -i "s,^\(logrotate = \).*,\1"True"," /etc/odoo/odoo.conf
+#sudo sed -i "s,^\(proxy_mode = \).*,\1"True"," /etc/odoo/odoo.conf
+#Creamos el archivo de inicio del servicio de Odoo:
+sudo cp /opt/odoo/odoo/debian/init /etc/init.d/odoo && sudo chmod +x /etc/init.d/odoo
+sudo ln -s /opt/odoo/odoo/odoo-bin /usr/bin/odoo
+sudo update-rc.d -f odoo start 20 2 3 4 5 .
+sudo service odoo start
